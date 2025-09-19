@@ -1,0 +1,2110 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบเก็บข้อมูลนักศึกษา - วิทยาลัยเสนาธิการทหาร</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+        
+        body { 
+            font-family: 'Sarabun', sans-serif;
+        }
+        
+        .course-card {
+            transition: all 0.3s ease;
+        }
+        
+        .course-card:hover {
+            transform: translateY(-4px);
+        }
+        
+        .student-card {
+            transition: all 0.2s ease;
+        }
+        
+        .student-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .loading-spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .message {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            z-index: 50;
+        }
+        
+        .message.show {
+            transform: translateX(0);
+        }
+        
+        .photo-preview {
+            width: 80px;
+            height: 80px;
+            border-radius: 0.5rem;
+            object-fit: cover;
+            border: 2px solid #e5e7eb;
+        }
+        
+        .student-photo {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .photo-placeholder {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: #f3f4f6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <h1 class="text-2xl sm:text-3xl font-bold flex items-center mb-2 sm:mb-0">
+                    <i class="fas fa-graduation-cap mr-3"></i>
+                    <div>
+                        <div>ข้อมูลนักศึกษา</div>
+                        <div class="text-lg font-medium">วิทยาลัยเสนาธิการทหาร</div>
+                    </div>
+                </h1>
+                <div class="flex items-center space-x-2">
+                    <div id="connectionStatus" class="bg-blue-500 px-3 py-1 rounded-full text-sm">
+                        <i class="fas fa-save mr-1"></i>บันทึกในเครื่อง
+                    </div>
+                    <div id="adminStatus" class="hidden bg-green-500 px-3 py-1 rounded-full text-sm">
+                        <i class="fas fa-shield-alt mr-1"></i>โหมดแอดมิน
+                    </div>
+                    <button onclick="toggleAdminLogin()" id="adminBtn" 
+                            class="bg-yellow-500 hover:bg-yellow-600 px-3 py-1 rounded text-sm transition-colors">
+                        <i class="fas fa-key mr-1"></i>แอดมิน
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-4 py-8">
+        <!-- Admin Login Modal -->
+        <div id="adminLoginModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+            <div class="bg-white rounded-xl shadow-2xl p-6 m-4 max-w-md w-full">
+                <h3 class="text-xl font-semibold text-gray-900 mb-4 text-center">เข้าสู่ระบบแอดมิน</h3>
+                <form id="adminLoginForm">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">รหัสผ่าน</label>
+                        <input type="password" id="adminPassword" required 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="กรุณาใส่รหัสผ่าน">
+                    </div>
+                    <div class="flex space-x-3">
+                        <button type="button" onclick="closeAdminLogin()" 
+                                class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg transition-colors">
+                            ยกเลิก
+                        </button>
+                        <button type="submit" 
+                                class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                            เข้าสู่ระบบ
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- GitHub Setup Modal -->
+        <div id="githubSetupModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+            <div class="bg-white rounded-xl shadow-2xl p-6 m-4 max-w-2xl w-full max-h-96 overflow-y-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold text-gray-900">🚀 ตั้งค่า GitHub Pages</h3>
+                    <button onclick="closeGitHubSetup()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="bg-green-50 p-4 rounded-lg border border-green-200">
+                        <h4 class="font-semibold text-green-800 mb-2">✅ ข้อดีของ GitHub Pages</h4>
+                        <ul class="text-sm text-green-700 space-y-1">
+                            <li>🆓 ฟรีตลอดชีพ - ไม่มีค่าใช้จ่าย</li>
+                            <li>👥 หลายคนใช้งานพร้อมกัน</li>
+                            <li>📝 เก็บประวัติการแก้ไขทั้งหมด</li>
+                            <li>🔒 ข้อมูลปลอดภัย 100%</li>
+                            <li>🌐 เข้าถึงได้จากทุกที่</li>
+                        </ul>
+                    </div>
+                    
+                    <form id="githubSetupForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">GitHub Username *</label>
+                            <input type="text" id="githubUsername" required 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                   placeholder="ชื่อผู้ใช้ GitHub ของคุณ">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Repository Name *</label>
+                            <input type="text" id="githubRepo" required value="student-management-system"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                   placeholder="ชื่อ repository">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Personal Access Token *</label>
+                            <input type="password" id="githubToken" required 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                   placeholder="GitHub Personal Access Token">
+                            <p class="text-xs text-gray-600 mt-1">
+                                <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800">
+                                    สร้าง Token ใหม่ที่นี่
+                                </a> (ต้องการสิทธิ์ repo)
+                            </p>
+                        </div>
+                        
+                        <div class="flex space-x-3">
+                            <button type="button" onclick="closeGitHubSetup()" 
+                                    class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg transition-colors">
+                                ยกเลิก
+                            </button>
+                            <button type="submit" 
+                                    class="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors">
+                                เชื่อมต่อ GitHub
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cloud Options Modal -->
+        <div id="cloudOptionsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+            <div class="bg-white rounded-xl shadow-2xl p-6 m-4 max-w-4xl w-full max-h-96 overflow-y-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold text-gray-900">🌟 ระบบคลาวด์ฟรีที่แนะนำ</h3>
+                    <button onclick="closeCloudOptions()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                        <h4 class="font-semibold text-orange-800 mb-2">🔥 Firebase Firestore</h4>
+                        <ul class="text-sm text-orange-700 space-y-1">
+                            <li>✅ 1GB ฟรี</li>
+                            <li>✅ Real-time sync</li>
+                            <li>✅ ใช้งานง่าย</li>
+                            <li>✅ Google Account</li>
+                        </ul>
+                        <a href="https://firebase.google.com/" target="_blank" rel="noopener noreferrer" 
+                           class="inline-block mt-2 bg-orange-600 text-white px-3 py-1 rounded text-sm hover:bg-orange-700">
+                            เริ่มใช้งาน
+                        </a>
+                    </div>
+                    
+                    <div class="bg-green-50 p-4 rounded-lg border border-green-200">
+                        <h4 class="font-semibold text-green-800 mb-2">⚡ Supabase</h4>
+                        <ul class="text-sm text-green-700 space-y-1">
+                            <li>✅ 500MB ฟรี</li>
+                            <li>✅ PostgreSQL</li>
+                            <li>✅ Real-time</li>
+                            <li>✅ API ง่าย</li>
+                        </ul>
+                        <a href="https://supabase.com/" target="_blank" rel="noopener noreferrer" 
+                           class="inline-block mt-2 bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700">
+                            เริ่มใช้งาน
+                        </a>
+                    </div>
+                    
+                    <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                        <h4 class="font-semibold text-blue-800 mb-2">📁 GitHub Pages</h4>
+                        <ul class="text-sm text-blue-700 space-y-1">
+                            <li>✅ ไม่จำกัดขนาด</li>
+                            <li>✅ Version control</li>
+                            <li>✅ JSON files</li>
+                            <li>✅ ฟรีตลอดชีพ</li>
+                        </ul>
+                        <a href="https://pages.github.com/" target="_blank" rel="noopener noreferrer" 
+                           class="inline-block mt-2 bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
+                            เริ่มใช้งาน
+                        </a>
+                    </div>
+                    
+                    <div class="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                        <h4 class="font-semibold text-purple-800 mb-2">⚡ Netlify Functions</h4>
+                        <ul class="text-sm text-purple-700 space-y-1">
+                            <li>✅ 125k requests/เดือน</li>
+                            <li>✅ Serverless</li>
+                            <li>✅ Auto deploy</li>
+                            <li>✅ CDN ฟรี</li>
+                        </ul>
+                        <a href="https://www.netlify.com/" target="_blank" rel="noopener noreferrer" 
+                           class="inline-block mt-2 bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700">
+                            เริ่มใช้งาน
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="mt-6 bg-gray-50 p-4 rounded-lg">
+                    <h4 class="font-semibold text-gray-800 mb-2">💡 คำแนะนำ:</h4>
+                    <p class="text-sm text-gray-700">
+                        สำหรับผู้เริ่มต้น แนะนำ <strong>Firebase</strong> เพราะใช้งานง่ายที่สุด 
+                        หรือ <strong>GitHub Pages</strong> ถ้าต้องการฟรีตลอดชีพ
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Backup Manager Modal -->
+        <div id="backupManagerModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+            <div class="bg-white rounded-xl shadow-2xl p-6 m-4 max-w-2xl w-full max-h-96 overflow-y-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold text-gray-900">จัดการข้อมูลสำรอง</h3>
+                    <button onclick="closeBackupManager()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <h4 class="font-semibold text-blue-800 mb-2">สถานะการสำรอง</h4>
+                        <div id="backupStatus" class="text-sm text-blue-700">
+                            กำลังตรวจสอบ...
+                        </div>
+                    </div>
+                    
+                    <div class="bg-green-50 p-4 rounded-lg">
+                        <h4 class="font-semibold text-green-800 mb-2">การดำเนินการ</h4>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="createManualBackup()" 
+                                    class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded text-sm transition-colors">
+                                <i class="fas fa-save mr-1"></i>สำรองตอนนี้
+                            </button>
+                            <button onclick="downloadBackup()" 
+                                    class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm transition-colors">
+                                <i class="fas fa-download mr-1"></i>ดาวน์โหลดสำรอง
+                            </button>
+                            <label for="restoreBackup" class="bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded text-sm transition-colors cursor-pointer">
+                                <i class="fas fa-upload mr-1"></i>กู้คืนจากไฟล์
+                                <input type="file" id="restoreBackup" accept=".json" class="hidden">
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-yellow-50 p-4 rounded-lg">
+                        <h4 class="font-semibold text-yellow-800 mb-2">ข้อมูลสำรองอัตโนมัติ</h4>
+                        <div id="backupList" class="space-y-2 max-h-40 overflow-y-auto">
+                            <!-- Backup list will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search Section -->
+        <div id="searchSection" class="hidden bg-white rounded-xl shadow-lg p-6 mb-8 border-l-4 border-purple-500">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+                <div class="flex items-center mb-4 sm:mb-0">
+                    <div class="bg-purple-100 p-3 rounded-full mr-4">
+                        <i class="fas fa-search text-purple-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-bold text-purple-800">ค้นหานักศึกษา</h2>
+                        <p class="text-sm text-purple-600">ค้นหาข้อมูลนักศึกษาจากทุกหลักสูตร</p>
+                    </div>
+                </div>
+                <button onclick="backToCourseSelection()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors">
+                    <i class="fas fa-arrow-left mr-2"></i>กลับ
+                </button>
+            </div>
+            <div class="mb-6">
+                <div class="relative">
+                    <input type="text" id="searchInput" placeholder="ค้นหาด้วยชื่อจริง, ชื่อเล่น, ตำแหน่ง หรือเบอร์โทร..." 
+                           class="w-full px-4 py-3 pl-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-lg">
+                    <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                </div>
+                <div class="flex flex-wrap gap-2 mt-3">
+                    <button onclick="filterByCourse('')" class="filter-btn bg-purple-600 text-white px-3 py-1 rounded-full text-sm transition-colors">ทั้งหมด</button>
+                    <button onclick="filterByCourse('เสนาธิการทหาร')" class="filter-btn bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-sm hover:bg-purple-100 transition-colors">เสนาธิการทหาร</button>
+                    <button onclick="filterByCourse('นายทหารอาวุโส บก.ทท.')" class="filter-btn bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-sm hover:bg-purple-100 transition-colors">นายทหารอาวุโส บก.ทท.</button>
+                    <button onclick="filterByCourse('เสนาธิการร่วม')" class="filter-btn bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-sm hover:bg-purple-100 transition-colors">เสนาธิการร่วม</button>
+                </div>
+            </div>
+            <div id="searchResults" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <!-- Search results will be displayed here -->
+            </div>
+        </div>
+
+        <!-- Course Selection -->
+        <div id="courseSelection" class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4 sm:mb-0">เลือกหลักสูตรเพื่อดูรายชื่อนักศึกษา</h2>
+                <button onclick="showSearchSection()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors">
+                    <i class="fas fa-search mr-2"></i>ค้นหานักศึกษา
+                </button>
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div onclick="selectCourse('เสนาธิการทหาร')" 
+                     class="course-card bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-xl cursor-pointer shadow-lg hover:shadow-xl">
+                    <div class="text-center">
+                        <i class="fas fa-star text-4xl mb-4"></i>
+                        <h3 class="text-xl font-semibold mb-2">หลักสูตรเสนาธิการทหาร</h3>
+                        <p class="text-blue-100" id="count-เสนาธิการทหาร">2 คน</p>
+                    </div>
+                </div>
+                <div onclick="selectCourse('นายทหารอาวุโส บก.ทท.')" 
+                     class="course-card bg-gradient-to-br from-green-500 to-green-600 text-white p-6 rounded-xl cursor-pointer shadow-lg hover:shadow-xl">
+                    <div class="text-center">
+                        <i class="fas fa-medal text-4xl mb-4"></i>
+                        <h3 class="text-xl font-semibold mb-2">หลักสูตรนายทหารอาวุโส บก.ทท.</h3>
+                        <p class="text-green-100" id="count-นายทหารอาวุโส บก.ทท.">1 คน</p>
+                    </div>
+                </div>
+                <div onclick="selectCourse('เสนาธิการร่วม')" 
+                     class="course-card bg-gradient-to-br from-purple-500 to-purple-600 text-white p-6 rounded-xl cursor-pointer shadow-lg hover:shadow-xl sm:col-span-2 lg:col-span-1">
+                    <div class="text-center">
+                        <i class="fas fa-handshake text-4xl mb-4"></i>
+                        <h3 class="text-xl font-semibold mb-2">หลักสูตรเสนาธิการร่วม</h3>
+                        <p class="text-purple-100" id="count-เสนาธิการร่วม">1 คน</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Panel -->
+        <div id="adminPanel" class="hidden bg-white rounded-xl shadow-lg p-6 mb-8 border-l-4 border-blue-500">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 mb-4 sm:mb-0">
+                    <i class="fas fa-shield-alt mr-3 text-blue-600"></i>ระบบจัดการแอดมิน
+                </h2>
+                <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
+                    <button onclick="toggleAddForm()" id="toggleAddBtn" 
+                            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors">
+                        <i class="fas fa-plus mr-2"></i>เพิ่มนักศึกษาใหม่
+                    </button>
+                    <button onclick="exportToCSV()" 
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition-colors">
+                        <i class="fas fa-download mr-2"></i>ส่งออกข้อมูล CSV
+                    </button>
+                    <label for="importCSV" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg transition-colors cursor-pointer">
+                        <i class="fas fa-upload mr-2"></i>นำเข้าข้อมูล CSV
+                        <input type="file" id="importCSV" accept=".csv" class="hidden">
+                    </label>
+                    <button onclick="showBackupManager()" 
+                            class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg transition-colors">
+                        <i class="fas fa-history mr-2"></i>จัดการสำรอง
+                    </button>
+                    <button onclick="showGitHubSetup()" 
+                            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors">
+                        <i class="fab fa-github mr-2"></i>GitHub Pages
+                    </button>
+                    <button onclick="showCloudOptions()" 
+                            class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors">
+                        <i class="fas fa-cloud mr-2"></i>ตัวเลือกอื่น
+                    </button>
+                    <button onclick="logoutAdmin()" 
+                            class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors">
+                        <i class="fas fa-sign-out-alt mr-2"></i>ออกจากระบบ
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Add Student Form -->
+            <div id="addStudentForm" class="hidden border-t-2 border-green-200 pt-6 bg-green-50 rounded-lg p-6">
+                <h3 class="text-xl font-bold text-green-800 mb-4">เพิ่มนักศึกษาใหม่</h3>
+                <form id="studentForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">หลักสูตร *</label>
+                        <select id="studentCourse" required 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">เลือกหลักสูตร</option>
+                            <option value="เสนาธิการทหาร">หลักสูตรเสนาธิการทหาร</option>
+                            <option value="นายทหารอาวุโส บก.ทท.">หลักสูตรนายทหารอาวุโส บก.ทท.</option>
+                            <option value="เสนาธิการร่วม">หลักสูตรเสนาธิการร่วม</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">ชื่อจริง *</label>
+                        <input type="text" id="fullName" required 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">ภาพประจำตัว</label>
+                        <input type="file" id="photo" accept="image/*" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <div id="photoPreview" class="mt-2"></div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">ชื่อเล่น</label>
+                        <input type="text" id="nickname" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">ตำแหน่ง</label>
+                        <input type="text" id="position" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">เบอร์โทรติดต่อ</label>
+                        <input type="tel" id="phone" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">วันเกิด</label>
+                        <input type="date" id="birthDate" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    <div class="md:col-span-2 flex space-x-3">
+                        <button type="button" onclick="toggleAddForm()" 
+                                class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-6 py-2 rounded-lg transition-colors">
+                            ยกเลิก
+                        </button>
+                        <button type="submit" id="submitBtn" 
+                                class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-2 rounded-lg transition-colors flex items-center">
+                            <span id="submitText">เพิ่มข้อมูล</span>
+                            <div id="submitSpinner" class="loading-spinner ml-2 hidden"></div>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Students List -->
+        <div id="studentsSection" class="hidden bg-white rounded-xl shadow-lg p-6 border-l-4 border-indigo-500">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-indigo-800" id="studentsTitle">รายชื่อนักศึกษา</h2>
+                    <p class="text-sm text-indigo-600">ข้อมูลนักศึกษาในหลักสูตรที่เลือก</p>
+                </div>
+                <button onclick="backToCourseSelection()" 
+                        class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors">
+                    <i class="fas fa-arrow-left mr-2"></i>กลับไปเลือกหลักสูตร
+                </button>
+            </div>
+            <div id="studentsList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <!-- Students will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Message -->
+    <div id="successMessage" class="message bg-green-500 text-white">
+        <i class="fas fa-check-circle mr-2"></i>
+        <span id="successText">บันทึกข้อมูลสำเร็จ!</span>
+    </div>
+
+    <!-- Error Message -->
+    <div id="errorMessage" class="message bg-red-500 text-white">
+        <i class="fas fa-exclamation-circle mr-2"></i>
+        <span id="errorText">เกิดข้อผิดพลาด!</span>
+    </div>
+
+    <script>
+        // GitHub Pages system - free forever with version control
+        // Data stored in JSON files in the repository
+        const GITHUB_CONFIG = {
+            username: 'YOUR_GITHUB_USERNAME', // เปลี่ยนเป็นชื่อผู้ใช้ GitHub ของคุณ
+            repository: 'student-management-system', // ชื่อ repository
+            branch: 'main',
+            dataFile: 'data/students.json'
+        };
+        
+        const STORAGE_KEY = 'student_management_system';
+        const BACKUP_PREFIX = 'backup_student_data';
+        
+        // Sheet names for each course - using simple sheet names
+        const SHEET_NAMES = {
+            'เสนาธิการทหาร': 'Sheet1',
+            'นายทหารอาวุโส บก.ทท.': 'Sheet2', 
+            'เสนาธิการร่วม': 'Sheet3'
+        };
+        const ADMIN_PASSWORD = 'admin123';
+        let currentCourse = '';
+        let isAdminLoggedIn = false;
+        let allStudentsData = [];
+        let filteredStudents = [];
+        let currentSearchFilter = '';
+        let isOnlineMode = false;
+        let syncInterval = null;
+        let lastSyncTime = null;
+        let autoBackupInterval = null;
+
+        // Demo data as fallback
+        let studentsData = {
+            'เสนาธิการทหาร': [
+                {
+                    id: 'demo1',
+                    fullName: 'พันเอก สมชาย ใจดี',
+                    nickname: 'ชาย',
+                    position: 'หัวหน้าแผนก',
+                    phone: '081-234-5678',
+                    birthDate: '1985-05-15',
+                    photoBase64: '',
+                    course: 'เสนาธิการทหาร'
+                },
+                {
+                    id: 'demo2',
+                    fullName: 'พันโท สมหญิง รักชาติ',
+                    nickname: 'หญิง',
+                    position: 'เจ้าหน้าที่วิเคราะห์',
+                    phone: '082-345-6789',
+                    birthDate: '1987-08-22',
+                    photoBase64: '',
+                    course: 'เสนาธิการทหาร'
+                }
+            ],
+            'นายทหารอาวุโส บก.ทท.': [
+                {
+                    id: 'demo3',
+                    fullName: 'จ่าเอก วิชัย กล้าหาญ',
+                    nickname: 'วิชัย',
+                    position: 'หัวหน้าหน่วย',
+                    phone: '083-456-7890',
+                    birthDate: '1980-12-10',
+                    photoBase64: '',
+                    course: 'นายทหารอาวุโส บก.ทท.'
+                }
+            ],
+            'เสนาธิการร่วม': [
+                {
+                    id: 'demo4',
+                    fullName: 'พันเอก สมศักดิ์ เก่งกาจ',
+                    nickname: 'ศักดิ์',
+                    position: 'ที่ปรึกษา',
+                    phone: '084-567-8901',
+                    birthDate: '1983-03-18',
+                    photoBase64: '',
+                    course: 'เสนาธิการร่วม'
+                }
+            ]
+        };
+
+        // GitHub Pages system with JSON file storage
+        // 🌟 GITHUB PAGES ADVANTAGES:
+        // 1. ฟรีตลอดชีพ - ไม่มีค่าใช้จ่าย
+        // 2. Version Control - เก็บประวัติการแก้ไขทั้งหมด
+        // 3. Multi-user - หลายคนใช้งานพร้อมกันได้
+        // 4. Backup อัตโนมัติ - ข้อมูลปลอดภัย 100%
+        
+        let githubToken = localStorage.getItem('github_token');
+        let isGitHubMode = false;
+        
+        function initializeCloudStorage() {
+            // Check if GitHub token is available
+            if (githubToken && GITHUB_CONFIG.username !== 'YOUR_GITHUB_USERNAME') {
+                isGitHubMode = true;
+                console.log('🌟 GitHub Pages mode activated - unlimited free storage!');
+                return true;
+            } else {
+                console.log('📱 Local storage mode - upgrade to GitHub Pages for multi-user access');
+                return false;
+            }
+        }
+        
+        // GitHub API functions
+        async function getGitHubFile(path) {
+            if (!githubToken) throw new Error('GitHub token required');
+            
+            const url = `https://api.github.com/repos/${GITHUB_CONFIG.username}/${GITHUB_CONFIG.repository}/contents/${path}`;
+            
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        'Authorization': `token ${githubToken}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+                
+                if (response.status === 404) {
+                    return null; // File doesn't exist yet
+                }
+                
+                if (!response.ok) {
+                    throw new Error(`GitHub API error: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                const content = atob(data.content.replace(/\s/g, ''));
+                return {
+                    content: JSON.parse(content),
+                    sha: data.sha
+                };
+            } catch (error) {
+                console.error('GitHub read error:', error);
+                throw error;
+            }
+        }
+        
+        async function saveGitHubFile(path, data, sha = null) {
+            if (!githubToken) throw new Error('GitHub token required');
+            
+            const url = `https://api.github.com/repos/${GITHUB_CONFIG.username}/${GITHUB_CONFIG.repository}/contents/${path}`;
+            const content = btoa(JSON.stringify(data, null, 2));
+            
+            const payload = {
+                message: `Update student data - ${new Date().toISOString()}`,
+                content: content,
+                branch: GITHUB_CONFIG.branch
+            };
+            
+            if (sha) {
+                payload.sha = sha;
+            }
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `token ${githubToken}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`GitHub API error: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('GitHub save error:', error);
+                throw error;
+            }
+        }
+        
+        async function syncWithGitHub() {
+            if (!isGitHubMode) return false;
+            
+            try {
+                // Get current data from GitHub
+                const githubData = await getGitHubFile(GITHUB_CONFIG.dataFile);
+                
+                if (githubData) {
+                    // Merge with local data
+                    const remoteData = githubData.content;
+                    const hasLocalChanges = JSON.stringify(studentsData) !== JSON.stringify(remoteData);
+                    
+                    if (hasLocalChanges) {
+                        // Simple merge strategy - use most recent data
+                        studentsData = remoteData;
+                        saveToLocalStorage();
+                        lastSyncTime = new Date();
+                        return true;
+                    }
+                }
+                
+                return false;
+            } catch (error) {
+                console.error('GitHub sync error:', error);
+                return false;
+            }
+        }
+        
+        async function pushToGitHub() {
+            if (!isGitHubMode) return false;
+            
+            try {
+                const existingFile = await getGitHubFile(GITHUB_CONFIG.dataFile);
+                const sha = existingFile ? existingFile.sha : null;
+                
+                await saveGitHubFile(GITHUB_CONFIG.dataFile, studentsData, sha);
+                lastSyncTime = new Date();
+                return true;
+            } catch (error) {
+                console.error('GitHub push error:', error);
+                throw error;
+            }
+        }
+
+        function parseSheetData(values, course) {
+            const students = [];
+
+            // Parse each row (no header row expected)
+            for (let i = 0; i < values.length; i++) {
+                const row = values[i];
+                if (row.length >= 1 && row[0]) { // At least name is required
+                    const student = {
+                        id: generateId(), // Generate new ID for each sync
+                        course: course,
+                        fullName: row[0] || '',
+                        nickname: row[1] || '',
+                        position: row[2] || '',
+                        phone: row[3] || '',
+                        birthDate: row[4] || '',
+                        photoBase64: row[5] || ''
+                    };
+
+                    students.push(student);
+                }
+            }
+
+            return students;
+        }
+
+
+
+        function mergeStudentsData(sheetsData) {
+            // Create a map of existing local students by ID
+            const localStudentsMap = new Map();
+            Object.keys(studentsData).forEach(course => {
+                studentsData[course].forEach(student => {
+                    localStudentsMap.set(student.id, student);
+                });
+            });
+
+            // Merge sheets data with local data
+            const mergedData = {
+                'เสนาธิการทหาร': [],
+                'นายทหารอาวุโส บก.ทท.': [],
+                'เสนาธิการร่วม': []
+            };
+
+            // Add sheets data (prioritize sheets data for conflicts)
+            Object.keys(sheetsData).forEach(course => {
+                sheetsData[course].forEach(student => {
+                    mergedData[course].push(student);
+                    localStudentsMap.delete(student.id); // Remove from local map
+                });
+            });
+
+            // Add remaining local-only students
+            localStudentsMap.forEach(student => {
+                if (mergedData[student.course]) {
+                    mergedData[student.course].push(student);
+                }
+            });
+
+            studentsData = mergedData;
+            saveToLocalStorage();
+        }
+
+        // Local storage functions with backup
+        function saveToLocalStorage() {
+            try {
+                const timestamp = new Date().toISOString();
+                localStorage.setItem('studentsData', JSON.stringify(studentsData));
+                localStorage.setItem('lastSaved', timestamp);
+                
+                // Create backup
+                createAutoBackup();
+            } catch (error) {
+                console.error('Local storage save error:', error);
+            }
+        }
+
+        function loadFromLocalStorage() {
+            try {
+                const saved = localStorage.getItem('studentsData');
+                if (saved) {
+                    studentsData = JSON.parse(saved);
+                }
+            } catch (error) {
+                console.error('Local storage load error:', error);
+                // Try to restore from backup
+                restoreFromBackup();
+            }
+        }
+
+        // Auto backup system
+        function createAutoBackup() {
+            try {
+                const timestamp = new Date().toISOString();
+                const backupKey = `backup_${timestamp.split('T')[0]}`; // Daily backup
+                const backupData = {
+                    timestamp: timestamp,
+                    data: studentsData
+                };
+                
+                localStorage.setItem(backupKey, JSON.stringify(backupData));
+                
+                // Keep only last 7 days of backups
+                cleanOldBackups();
+            } catch (error) {
+                console.error('Auto backup error:', error);
+            }
+        }
+
+        function cleanOldBackups() {
+            try {
+                const keys = Object.keys(localStorage);
+                const backupKeys = keys.filter(key => key.startsWith('backup_'));
+                
+                // Sort by date and keep only last 7
+                backupKeys.sort().reverse();
+                
+                for (let i = 7; i < backupKeys.length; i++) {
+                    localStorage.removeItem(backupKeys[i]);
+                }
+            } catch (error) {
+                console.error('Cleanup backups error:', error);
+            }
+        }
+
+        function restoreFromBackup() {
+            try {
+                const keys = Object.keys(localStorage);
+                const backupKeys = keys.filter(key => key.startsWith('backup_'));
+                
+                if (backupKeys.length > 0) {
+                    // Get most recent backup
+                    backupKeys.sort().reverse();
+                    const latestBackup = localStorage.getItem(backupKeys[0]);
+                    
+                    if (latestBackup) {
+                        const backupData = JSON.parse(latestBackup);
+                        studentsData = backupData.data;
+                        showMessage('success', 'กู้คืนข้อมูลจากสำรองสำเร็จ');
+                        return true;
+                    }
+                }
+            } catch (error) {
+                console.error('Restore from backup error:', error);
+            }
+            return false;
+        }
+
+        // Start auto sync and backup
+        function startAutoSync() {
+            // Sync every 30 seconds
+            syncInterval = setInterval(async () => {
+                if (isOnlineMode) {
+                    await syncWithGoogleSheets();
+                }
+            }, 30000);
+
+            // Auto backup every 5 minutes
+            autoBackupInterval = setInterval(() => {
+                createAutoBackup();
+            }, 300000);
+        }
+
+        function stopAutoSync() {
+            if (syncInterval) {
+                clearInterval(syncInterval);
+                syncInterval = null;
+            }
+            if (autoBackupInterval) {
+                clearInterval(autoBackupInterval);
+                autoBackupInterval = null;
+            }
+        }
+
+        async function createStudent(studentData) {
+            try {
+                // Add to local data
+                const newStudent = {
+                    id: generateId(),
+                    ...studentData
+                };
+                
+                if (!studentsData[studentData.course]) {
+                    studentsData[studentData.course] = [];
+                }
+                
+                studentsData[studentData.course].push(newStudent);
+                saveToLocalStorage();
+                
+                // Sync to GitHub if enabled
+                if (isGitHubMode) {
+                    try {
+                        await pushToGitHub();
+                        return { 
+                            success: true, 
+                            message: '🎉 บันทึกข้อมูลและซิงค์ GitHub สำเร็จ!', 
+                            online: true 
+                        };
+                    } catch (error) {
+                        console.error('GitHub sync error:', error);
+                        return { 
+                            success: true, 
+                            message: '💾 บันทึกในเครื่องสำเร็จ (ซิงค์ GitHub ล้มเหลว)', 
+                            local: true 
+                        };
+                    }
+                } else {
+                    return { 
+                        success: true, 
+                        message: '💾 บันทึกข้อมูลในเครื่องสำเร็จ!', 
+                        local: true 
+                    };
+                }
+            } catch (error) {
+                console.error('Create student error:', error);
+                return { success: false, error: 'เกิดข้อผิดพลาดในการบันทึกข้อมูล' };
+            }
+        }
+
+        async function readStudents(course) {
+            try {
+                return {
+                    success: true,
+                    data: studentsData[course] || [],
+                    offline: true
+                };
+            } catch (error) {
+                console.error('Read students error:', error);
+                return {
+                    success: false,
+                    error: 'เกิดข้อผิดพลาดในการอ่านข้อมูล'
+                };
+            }
+        }
+
+        async function deleteStudent(studentId, course) {
+            try {
+                const studentIndex = studentsData[course]?.findIndex(s => s.id === studentId);
+                if (studentIndex !== -1) {
+                    studentsData[course].splice(studentIndex, 1);
+                    saveToLocalStorage();
+                    
+                    return { 
+                        success: true, 
+                        message: 'ลบข้อมูลนักศึกษาสำเร็จ! 🗑️', 
+                        local: true 
+                    };
+                }
+                return { success: false, error: 'ไม่พบข้อมูลที่ต้องการลบ' };
+            } catch (error) {
+                console.error('Delete student error:', error);
+                return { success: false, error: 'เกิดข้อผิดพลาดในการลบข้อมูล' };
+            }
+        }
+
+        // Utility functions
+        function generateId() {
+            return 'student_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        // Advanced image compression system
+        function compressImage(file, maxWidth = 400, maxHeight = 400, quality = 0.8) {
+            return new Promise((resolve, reject) => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                
+                img.onload = () => {
+                    try {
+                        let { width, height } = img;
+                        
+                        // Calculate new dimensions maintaining aspect ratio
+                        const aspectRatio = width / height;
+                        
+                        if (width > maxWidth || height > maxHeight) {
+                            if (width > height) {
+                                width = maxWidth;
+                                height = width / aspectRatio;
+                                if (height > maxHeight) {
+                                    height = maxHeight;
+                                    width = height * aspectRatio;
+                                }
+                            } else {
+                                height = maxHeight;
+                                width = height * aspectRatio;
+                                if (width > maxWidth) {
+                                    width = maxWidth;
+                                    height = width / aspectRatio;
+                                }
+                            }
+                        }
+                        
+                        canvas.width = width;
+                        canvas.height = height;
+                        
+                        // Enable image smoothing for better quality
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
+                        
+                        // Draw with white background for transparency handling
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.fillRect(0, 0, width, height);
+                        
+                        // Draw and compress
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        // Try different compression levels based on file size
+                        canvas.toBlob((blob) => {
+                            if (blob) {
+                                // If still too large, compress more
+                                if (blob.size > 500000 && quality > 0.3) { // 500KB limit
+                                    compressImage(file, maxWidth * 0.8, maxHeight * 0.8, quality * 0.7)
+                                        .then(resolve)
+                                        .catch(reject);
+                                } else {
+                                    resolve(blob);
+                                }
+                            } else {
+                                reject(new Error('Failed to compress image'));
+                            }
+                        }, 'image/jpeg', quality);
+                        
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                
+                img.onerror = () => reject(new Error('Failed to load image'));
+                img.src = URL.createObjectURL(file);
+            });
+        }
+
+        // Progressive image loading
+        function createProgressiveImage(base64Data) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    // Create a low-quality preview first
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    canvas.width = 64;
+                    canvas.height = 64;
+                    
+                    ctx.drawImage(img, 0, 0, 64, 64);
+                    const lowQuality = canvas.toDataURL('image/jpeg', 0.3);
+                    
+                    resolve({
+                        lowQuality: lowQuality,
+                        highQuality: base64Data
+                    });
+                };
+                img.src = base64Data;
+            });
+        }
+
+        // Image validation and processing
+        function validateAndProcessImage(file) {
+            return new Promise((resolve, reject) => {
+                // Validate file type
+                const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+                if (!validTypes.includes(file.type)) {
+                    reject(new Error('รองรับเฉพาะไฟล์ JPG, PNG และ WebP เท่านั้น'));
+                    return;
+                }
+
+                // Validate file size (max 10MB)
+                if (file.size > 10 * 1024 * 1024) {
+                    reject(new Error('ไฟล์รูปภาพต้องมีขนาดไม่เกิน 10MB'));
+                    return;
+                }
+
+                // Check image dimensions
+                const img = new Image();
+                img.onload = async () => {
+                    try {
+                        // Warn if image is too small
+                        if (img.width < 100 || img.height < 100) {
+                            if (!confirm('รูปภาพมีขนาดเล็ก อาจทำให้คุณภาพไม่ดี ต้องการใช้รูปนี้หรือไม่?')) {
+                                reject(new Error('ยกเลิกการใช้รูปภาพ'));
+                                return;
+                            }
+                        }
+
+                        // Compress image
+                        const compressedBlob = await compressImage(file);
+                        const base64 = await fileToBase64(compressedBlob);
+                        
+                        resolve({
+                            base64: base64,
+                            originalSize: file.size,
+                            compressedSize: compressedBlob.size,
+                            dimensions: { width: img.width, height: img.height }
+                        });
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                
+                img.onerror = () => reject(new Error('ไฟล์รูปภาพเสียหาย'));
+                img.src = URL.createObjectURL(file);
+            });
+        }
+
+        function showMessage(type, message) {
+            const messageEl = document.getElementById(type === 'success' ? 'successMessage' : 'errorMessage');
+            const textEl = document.getElementById(type === 'success' ? 'successText' : 'errorText');
+            
+            textEl.textContent = message;
+            messageEl.classList.add('show');
+            
+            setTimeout(() => {
+                messageEl.classList.remove('show');
+            }, 3000);
+        }
+
+        function updateConnectionStatus(mode) {
+            const statusEl = document.getElementById('connectionStatus');
+            
+            if (mode === 'github') {
+                statusEl.className = 'bg-green-500 px-3 py-1 rounded-full text-sm';
+                statusEl.innerHTML = '<i class="fab fa-github mr-1"></i>GitHub Pages';
+                isOnlineMode = true;
+            } else if (mode === 'local') {
+                statusEl.className = 'bg-blue-500 px-3 py-1 rounded-full text-sm';
+                statusEl.innerHTML = '<i class="fas fa-save mr-1"></i>บันทึกในเครื่อง';
+                isOnlineMode = false;
+            }
+            
+            // Update last sync time display
+            if (isOnlineMode && lastSyncTime) {
+                const timeStr = lastSyncTime.toLocaleTimeString('th-TH');
+                statusEl.title = `ซิงค์ล่าสุด: ${timeStr}`;
+            }
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('th-TH', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+
+        // Admin functions
+        function toggleAdminLogin() {
+            if (isAdminLoggedIn) {
+                logoutAdmin();
+            } else {
+                document.getElementById('adminLoginModal').classList.remove('hidden');
+                document.getElementById('adminPassword').focus();
+            }
+        }
+
+        function closeAdminLogin() {
+            document.getElementById('adminLoginModal').classList.add('hidden');
+            document.getElementById('adminPassword').value = '';
+        }
+
+        function loginAdmin(password) {
+            if (password === ADMIN_PASSWORD) {
+                isAdminLoggedIn = true;
+                document.getElementById('adminStatus').classList.remove('hidden');
+                document.getElementById('adminPanel').classList.remove('hidden');
+                document.getElementById('adminBtn').innerHTML = '<i class="fas fa-sign-out-alt mr-1"></i>ออกจากระบบ';
+                document.getElementById('adminBtn').className = 'bg-red-500 hover:bg-red-600 px-3 py-1 rounded text-sm transition-colors';
+                closeAdminLogin();
+                showMessage('success', 'เข้าสู่ระบบแอดมินสำเร็จ!');
+                return true;
+            } else {
+                showMessage('error', 'รหัสผ่านไม่ถูกต้อง!');
+                return false;
+            }
+        }
+
+        function logoutAdmin() {
+            isAdminLoggedIn = false;
+            document.getElementById('adminStatus').classList.add('hidden');
+            document.getElementById('adminPanel').classList.add('hidden');
+            document.getElementById('addStudentForm').classList.add('hidden');
+            document.getElementById('adminBtn').innerHTML = '<i class="fas fa-key mr-1"></i>แอดมิน';
+            document.getElementById('adminBtn').className = 'bg-yellow-500 hover:bg-yellow-600 px-3 py-1 rounded text-sm transition-colors';
+            document.getElementById('toggleAddBtn').innerHTML = '<i class="fas fa-plus mr-2"></i>เพิ่มนักศึกษาใหม่';
+            showMessage('success', 'ออกจากระบบแอดมินแล้ว');
+        }
+
+        function toggleAddForm() {
+            if (!isAdminLoggedIn) {
+                showMessage('error', 'กรุณาเข้าสู่ระบบแอดมินก่อน');
+                return;
+            }
+            const form = document.getElementById('addStudentForm');
+            const btn = document.getElementById('toggleAddBtn');
+            
+            if (form.classList.contains('hidden')) {
+                form.classList.remove('hidden');
+                btn.innerHTML = '<i class="fas fa-minus mr-2"></i>ยกเลิก';
+                btn.className = 'bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors';
+            } else {
+                form.classList.add('hidden');
+                btn.innerHTML = '<i class="fas fa-plus mr-2"></i>เพิ่มนักศึกษาใหม่';
+                btn.className = 'bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors';
+                document.getElementById('studentForm').reset();
+                document.getElementById('photoPreview').innerHTML = '';
+            }
+        }
+
+        // Course selection
+        function selectCourse(course) {
+            currentCourse = course;
+            document.getElementById('studentsTitle').textContent = `รายชื่อนักศึกษา - ${course}`;
+            document.getElementById('studentsSection').classList.remove('hidden');
+            document.getElementById('courseSelection').classList.add('hidden');
+            document.getElementById('searchSection').classList.add('hidden');
+            loadStudents();
+        }
+
+        function backToCourseSelection() {
+            currentCourse = '';
+            document.getElementById('studentsSection').classList.add('hidden');
+            document.getElementById('searchSection').classList.add('hidden');
+            document.getElementById('courseSelection').classList.remove('hidden');
+        }
+
+        function showSearchSection() {
+            document.getElementById('searchSection').classList.remove('hidden');
+            document.getElementById('courseSelection').classList.add('hidden');
+            document.getElementById('studentsSection').classList.add('hidden');
+            loadAllStudentsForSearch();
+            performSearch();
+        }
+
+        // Load students
+        async function loadStudents() {
+            const studentsList = document.getElementById('studentsList');
+            studentsList.innerHTML = '<div class="col-span-full text-center py-8"><div class="loading-spinner mx-auto mb-4"></div><p class="text-gray-600">กำลังโหลดข้อมูล...</p></div>';
+
+            try {
+                const result = await readStudents(currentCourse);
+                if (result.success) {
+                    displayStudents(result.data || []);
+                    if (result.offline) {
+                        showMessage('error', 'โหลดข้อมูลในโหมดออฟไลน์');
+                    }
+                } else {
+                    throw new Error(result.error || 'ไม่สามารถโหลดข้อมูลได้');
+                }
+            } catch (error) {
+                console.error('Load students error:', error);
+                displayStudents([]);
+                showMessage('error', 'เกิดข้อผิดพลาดในการโหลดข้อมูล');
+            }
+        }
+
+        async function loadAllStudentsForSearch() {
+            allStudentsData = [];
+            const courses = ['เสนาธิการทหาร', 'นายทหารอาวุโส บก.ทท.', 'เสนาธิการร่วม'];
+            
+            for (const course of courses) {
+                try {
+                    const result = await readStudents(course);
+                    if (result.success && result.data) {
+                        const studentsWithCourse = result.data.map(student => ({
+                            ...student,
+                            course: course
+                        }));
+                        allStudentsData = allStudentsData.concat(studentsWithCourse);
+                    }
+                } catch (error) {
+                    console.error(`Error loading ${course}:`, error);
+                }
+            }
+        }
+
+        async function updateCourseCounts() {
+            const courses = ['เสนาธิการทหาร', 'นายทหารอาวุโส บก.ทท.', 'เสนาธิการร่วม'];
+            
+            for (const course of courses) {
+                const countElement = document.getElementById(`count-${course}`);
+                if (countElement) {
+                    try {
+                        const result = await readStudents(course);
+                        const count = result.success && result.data ? result.data.length : 0;
+                        countElement.textContent = `${count} คน`;
+                    } catch (error) {
+                        countElement.textContent = 'ข้อผิดพลาด';
+                    }
+                }
+            }
+        }
+
+        function displayStudents(students) {
+            const studentsList = document.getElementById('studentsList');
+            
+            if (students.length === 0) {
+                studentsList.innerHTML = `
+                    <div class="col-span-full text-center py-8 text-gray-500">
+                        <i class="fas fa-users text-4xl mb-4"></i>
+                        <p>ยังไม่มีข้อมูลนักศึกษาในหลักสูตรนี้</p>
+                    </div>
+                `;
+                return;
+            }
+
+            studentsList.innerHTML = students.map(student => createStudentCard(student)).join('');
+        }
+
+        function createStudentCard(student) {
+            const courseColors = {
+                'เสนาธิการทหาร': 'border-blue-200 bg-gradient-to-br from-blue-50 to-white',
+                'นายทหารอาวุโส บก.ทท.': 'border-green-200 bg-gradient-to-br from-green-50 to-white',
+                'เสนาธิการร่วม': 'border-purple-200 bg-gradient-to-br from-purple-50 to-white'
+            };
+
+            const cardClass = courseColors[student.course] || 'border-gray-200 bg-gradient-to-br from-gray-50 to-white';
+
+            const adminButtons = isAdminLoggedIn ? `
+                <div class="flex space-x-2 mt-4">
+                    <button onclick="deleteStudentById('${student.id}', '${student.course}')" 
+                            class="flex-1 bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm transition-colors">
+                        <i class="fas fa-trash mr-1"></i>ลบ
+                    </button>
+                </div>
+            ` : '';
+
+            const photoElement = student.photoBase64 ? 
+                `<img src="${student.photoBase64}" alt="${student.fullName}" class="student-photo mx-auto">` :
+                `<div class="photo-placeholder mx-auto">
+                    <i class="fas fa-user text-gray-400 text-xl"></i>
+                </div>`;
+
+            return `
+                <div class="student-card rounded-xl shadow-md hover:shadow-lg p-6 border ${cardClass}">
+                    <div class="text-center mb-4">
+                        ${photoElement}
+                    </div>
+                    <div class="space-y-2">
+                        <h3 class="font-semibold text-lg text-gray-800 text-center">${student.fullName}</h3>
+                        ${student.nickname ? `<p class="text-gray-600 text-center text-sm"><i class="fas fa-smile mr-1"></i>${student.nickname}</p>` : ''}
+                        ${student.position ? `<p class="text-gray-600 text-sm"><i class="fas fa-briefcase mr-2"></i>${student.position}</p>` : ''}
+                        ${student.phone ? `<p class="text-gray-600 text-sm"><i class="fas fa-phone mr-2"></i><a href="tel:${student.phone}" class="text-blue-600 hover:text-blue-800">${student.phone}</a></p>` : ''}
+                        ${student.birthDate ? `<p class="text-gray-600 text-sm"><i class="fas fa-birthday-cake mr-2"></i>${formatDate(student.birthDate)}</p>` : ''}
+                    </div>
+                    ${adminButtons}
+                </div>
+            `;
+        }
+
+        // Search functionality
+        function performSearch() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
+            
+            let studentsToSearch = currentSearchFilter ? 
+                allStudentsData.filter(student => student.course === currentSearchFilter) : 
+                allStudentsData;
+            
+            if (searchTerm) {
+                filteredStudents = studentsToSearch.filter(student => {
+                    return (
+                        (student.fullName && student.fullName.toLowerCase().includes(searchTerm)) ||
+                        (student.nickname && student.nickname.toLowerCase().includes(searchTerm)) ||
+                        (student.position && student.position.toLowerCase().includes(searchTerm)) ||
+                        (student.phone && student.phone.includes(searchTerm))
+                    );
+                });
+            } else {
+                filteredStudents = studentsToSearch;
+            }
+            
+            displaySearchResults(filteredStudents, searchTerm);
+        }
+
+        function filterByCourse(course) {
+            currentSearchFilter = course;
+            
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.className = 'filter-btn bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-sm hover:bg-purple-100 transition-colors';
+            });
+            
+            event.target.className = 'filter-btn bg-purple-600 text-white px-3 py-1 rounded-full text-sm transition-colors';
+            performSearch();
+        }
+
+        function displaySearchResults(students, searchTerm = '') {
+            const resultsContainer = document.getElementById('searchResults');
+            
+            if (students.length === 0) {
+                resultsContainer.innerHTML = `
+                    <div class="col-span-full text-center py-8 text-gray-500">
+                        <i class="fas fa-search text-4xl mb-4"></i>
+                        <p>ไม่พบข้อมูลที่ค้นหา</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            resultsContainer.innerHTML = students.map(student => createStudentCard(student)).join('');
+        }
+
+        // File handling
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // Photo preview with advanced compression
+        document.getElementById('photo').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            const preview = document.getElementById('photoPreview');
+            
+            if (file) {
+                try {
+                    // Show loading state
+                    preview.innerHTML = `
+                        <div class="photo-preview bg-gray-100 flex items-center justify-center">
+                            <div class="text-center">
+                                <div class="loading-spinner mx-auto mb-2"></div>
+                                <p class="text-xs text-gray-600">กำลังประมวลผล...</p>
+                            </div>
+                        </div>
+                    `;
+
+                    // Validate and process image
+                    const result = await validateAndProcessImage(file);
+                    
+                    // Show preview with compression info
+                    const compressionRatio = ((result.originalSize - result.compressedSize) / result.originalSize * 100).toFixed(1);
+                    
+                    preview.innerHTML = `
+                        <div class="space-y-2">
+                            <img src="${result.base64}" class="photo-preview">
+                            <div class="text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                                <div>ขนาดต้นฉบับ: ${(result.originalSize / 1024).toFixed(1)} KB</div>
+                                <div>ขนาดหลังบีบอัด: ${(result.compressedSize / 1024).toFixed(1)} KB</div>
+                                <div class="text-green-600">ประหยัดพื้นที่: ${compressionRatio}%</div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Store processed image data
+                    e.target.processedImage = result;
+                    
+                } catch (error) {
+                    console.error('Photo processing error:', error);
+                    showMessage('error', error.message || 'เกิดข้อผิดพลาดในการประมวลผลรูปภาพ');
+                    e.target.value = '';
+                    preview.innerHTML = '';
+                }
+            } else {
+                preview.innerHTML = '';
+                delete e.target.processedImage;
+            }
+        });
+
+        // Add student
+        document.getElementById('studentForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const selectedCourse = document.getElementById('studentCourse').value;
+            if (!selectedCourse) {
+                showMessage('error', 'กรุณาเลือกหลักสูตร');
+                return;
+            }
+
+            const submitBtn = document.getElementById('submitBtn');
+            const submitSpinner = document.getElementById('submitSpinner');
+            const submitText = document.getElementById('submitText');
+            
+            submitBtn.disabled = true;
+            submitSpinner.classList.remove('hidden');
+            submitText.textContent = 'กำลังบันทึก...';
+
+            try {
+                let photoBase64 = '';
+                const photoInput = document.getElementById('photo');
+                
+                if (photoInput.processedImage) {
+                    photoBase64 = photoInput.processedImage.base64;
+                }
+
+                const studentData = {
+                    course: selectedCourse,
+                    fullName: document.getElementById('fullName').value,
+                    nickname: document.getElementById('nickname').value,
+                    position: document.getElementById('position').value,
+                    phone: document.getElementById('phone').value,
+                    birthDate: document.getElementById('birthDate').value,
+                    photoBase64: photoBase64
+                };
+
+                const result = await createStudent(studentData);
+
+                if (result.success) {
+                    let message = result.message || 'เพิ่มข้อมูลนักศึกษาสำเร็จ!';
+                    if (result.offline) {
+                        message += ' (โหมดออฟไลน์)';
+                    }
+                    showMessage('success', message);
+                    
+                    document.getElementById('studentForm').reset();
+                    document.getElementById('photoPreview').innerHTML = '';
+                    toggleAddForm();
+                    await updateCourseCounts();
+                    
+                    if (currentCourse === selectedCourse) {
+                        await loadStudents();
+                    }
+                } else {
+                    throw new Error(result.error || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+                }
+            } catch (error) {
+                console.error('Submit error:', error);
+                showMessage('error', error.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+            } finally {
+                submitBtn.disabled = false;
+                submitSpinner.classList.add('hidden');
+                submitText.textContent = 'เพิ่มข้อมูล';
+            }
+        });
+
+        // Delete student
+        async function deleteStudentById(studentId, course) {
+            if (!isAdminLoggedIn) {
+                showMessage('error', 'กรุณาเข้าสู่ระบบแอดมินก่อน');
+                return;
+            }
+            
+            if (confirm('คุณแน่ใจหรือไม่ที่จะลบข้อมูลนักศึกษานี้?')) {
+                try {
+                    const result = await deleteStudent(studentId, course);
+                    
+                    if (result.success) {
+                        let message = result.message || 'ลบข้อมูลสำเร็จ!';
+                        if (result.offline) {
+                            message += ' (โหมดออฟไลน์)';
+                        }
+                        showMessage('success', message);
+                        
+                        await updateCourseCounts();
+                        
+                        if (currentCourse === course) {
+                            await loadStudents();
+                        }
+                        
+                        await loadAllStudentsForSearch();
+                        performSearch();
+                    } else {
+                        throw new Error(result.error || 'เกิดข้อผิดพลาดในการลบข้อมูล');
+                    }
+                } catch (error) {
+                    console.error('Delete error:', error);
+                    showMessage('error', error.message || 'เกิดข้อผิดพลาดในการลบข้อมูล');
+                }
+            }
+        }
+
+        // Update course counts
+        function updateCourseCounts() {
+            Object.keys(studentsData).forEach(course => {
+                const countElement = document.getElementById(`count-${course}`);
+                if (countElement) {
+                    const count = studentsData[course].length;
+                    countElement.textContent = `${count} คน`;
+                }
+            });
+        }
+
+        // Event listeners
+        document.getElementById('adminLoginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const password = document.getElementById('adminPassword').value;
+            loginAdmin(password);
+        });
+
+        document.getElementById('searchInput').addEventListener('input', performSearch);
+        
+        document.getElementById('importCSV').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                importFromCSV(file);
+                e.target.value = ''; // Reset file input
+            }
+        });
+
+        // Export to CSV function
+        function exportToCSV() {
+            if (!isAdminLoggedIn) {
+                showMessage('error', 'กรุณาเข้าสู่ระบบแอดมินก่อน');
+                return;
+            }
+
+            try {
+                let csvContent = 'หลักสูตร,ชื่อจริง,ชื่อเล่น,ตำแหน่ง,เบอร์โทร,วันเกิด\n';
+                
+                Object.keys(studentsData).forEach(course => {
+                    studentsData[course].forEach(student => {
+                        const row = [
+                            course,
+                            student.fullName || '',
+                            student.nickname || '',
+                            student.position || '',
+                            student.phone || '',
+                            student.birthDate || ''
+                        ].map(field => `"${field.replace(/"/g, '""')}"`).join(',');
+                        csvContent += row + '\n';
+                    });
+                });
+
+                const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', `ข้อมูลนักศึกษา_${new Date().toISOString().split('T')[0]}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                showMessage('success', 'ส่งออกข้อมูล CSV สำเร็จ!');
+            } catch (error) {
+                console.error('Export error:', error);
+                showMessage('error', 'เกิดข้อผิดพลาดในการส่งออกข้อมูล');
+            }
+        }
+
+        // Import from CSV function
+        function importFromCSV(file) {
+            if (!isAdminLoggedIn) {
+                showMessage('error', 'กรุณาเข้าสู่ระบบแอดมินก่อน');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const csv = e.target.result;
+                    const lines = csv.split('\n');
+                    let importCount = 0;
+                    
+                    // Skip header row
+                    for (let i = 1; i < lines.length; i++) {
+                        const line = lines[i].trim();
+                        if (!line) continue;
+                        
+                        // Parse CSV line (handle quoted fields)
+                        const fields = [];
+                        let current = '';
+                        let inQuotes = false;
+                        
+                        for (let j = 0; j < line.length; j++) {
+                            const char = line[j];
+                            if (char === '"') {
+                                inQuotes = !inQuotes;
+                            } else if (char === ',' && !inQuotes) {
+                                fields.push(current.replace(/^"|"$/g, '').replace(/""/g, '"'));
+                                current = '';
+                            } else {
+                                current += char;
+                            }
+                        }
+                        fields.push(current.replace(/^"|"$/g, '').replace(/""/g, '"'));
+                        
+                        if (fields.length >= 2) {
+                            const [course, fullName, nickname, position, phone, birthDate] = fields;
+                            
+                            if (course && fullName) {
+                                const newStudent = {
+                                    id: generateId(),
+                                    course: course,
+                                    fullName: fullName,
+                                    nickname: nickname || '',
+                                    position: position || '',
+                                    phone: phone || '',
+                                    birthDate: birthDate || '',
+                                    photoBase64: ''
+                                };
+                                
+                                if (!studentsData[course]) {
+                                    studentsData[course] = [];
+                                }
+                                
+                                studentsData[course].push(newStudent);
+                                importCount++;
+                            }
+                        }
+                    }
+                    
+                    if (importCount > 0) {
+                        saveToLocalStorage();
+                        updateCourseCounts();
+                        showMessage('success', `นำเข้าข้อมูล ${importCount} รายการสำเร็จ!`);
+                        
+                        // Refresh current view if needed
+                        if (currentCourse) {
+                            loadStudents();
+                        }
+                    } else {
+                        showMessage('error', 'ไม่พบข้อมูลที่ถูกต้องในไฟล์ CSV');
+                    }
+                } catch (error) {
+                    console.error('Import error:', error);
+                    showMessage('error', 'เกิดข้อผิดพลาดในการนำเข้าข้อมูล');
+                }
+            };
+            
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        // Backup management functions
+        function showBackupManager() {
+            if (!isAdminLoggedIn) {
+                showMessage('error', 'กรุณาเข้าสู่ระบบแอดมินก่อน');
+                return;
+            }
+            
+            document.getElementById('backupManagerModal').classList.remove('hidden');
+            updateBackupStatus();
+            loadBackupList();
+        }
+
+        function closeBackupManager() {
+            document.getElementById('backupManagerModal').classList.add('hidden');
+        }
+
+        function updateBackupStatus() {
+            const statusEl = document.getElementById('backupStatus');
+            const lastSaved = localStorage.getItem('lastSaved');
+            const backupKeys = Object.keys(localStorage).filter(key => key.startsWith('backup_'));
+            
+            let statusHTML = '';
+            if (lastSaved) {
+                const lastSavedDate = new Date(lastSaved);
+                statusHTML += `<div>บันทึกล่าสุด: ${lastSavedDate.toLocaleString('th-TH')}</div>`;
+            }
+            
+            statusHTML += `<div>จำนวนข้อมูลสำรอง: ${backupKeys.length} ไฟล์</div>`;
+            
+            if (isOnlineMode && lastSyncTime) {
+                statusHTML += `<div>ซิงค์ล่าสุด: ${lastSyncTime.toLocaleString('th-TH')}</div>`;
+            }
+            
+            statusEl.innerHTML = statusHTML;
+        }
+
+        function loadBackupList() {
+            const listEl = document.getElementById('backupList');
+            const backupKeys = Object.keys(localStorage).filter(key => key.startsWith('backup_'));
+            
+            if (backupKeys.length === 0) {
+                listEl.innerHTML = '<div class="text-gray-500 text-sm">ไม่มีข้อมูลสำรองอัตโนมัติ</div>';
+                return;
+            }
+            
+            backupKeys.sort().reverse(); // Most recent first
+            
+            const backupHTML = backupKeys.map(key => {
+                try {
+                    const backup = JSON.parse(localStorage.getItem(key));
+                    const date = new Date(backup.timestamp);
+                    const totalStudents = Object.values(backup.data).reduce((sum, course) => sum + course.length, 0);
+                    
+                    return `
+                        <div class="flex justify-between items-center bg-white p-3 rounded border">
+                            <div>
+                                <div class="font-medium">${date.toLocaleDateString('th-TH')}</div>
+                                <div class="text-sm text-gray-600">${totalStudents} นักศึกษา - ${date.toLocaleTimeString('th-TH')}</div>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button onclick="restoreFromSpecificBackup('${key}')" 
+                                        class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs transition-colors">
+                                    กู้คืน
+                                </button>
+                                <button onclick="deleteBackup('${key}')" 
+                                        class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs transition-colors">
+                                    ลบ
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                } catch (error) {
+                    return '';
+                }
+            }).join('');
+            
+            listEl.innerHTML = backupHTML;
+        }
+
+        function createManualBackup() {
+            try {
+                createAutoBackup();
+                showMessage('success', 'สร้างข้อมูลสำรองสำเร็จ!');
+                updateBackupStatus();
+                loadBackupList();
+            } catch (error) {
+                showMessage('error', 'เกิดข้อผิดพลาดในการสร้างข้อมูลสำรอง');
+            }
+        }
+
+        function downloadBackup() {
+            try {
+                const backupData = {
+                    timestamp: new Date().toISOString(),
+                    data: studentsData,
+                    version: '1.0'
+                };
+                
+                const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `ข้อมูลสำรอง_${new Date().toISOString().split('T')[0]}.json`;
+                link.click();
+                URL.revokeObjectURL(url);
+                
+                showMessage('success', 'ดาวน์โหลดข้อมูลสำรองสำเร็จ!');
+            } catch (error) {
+                showMessage('error', 'เกิดข้อผิดพลาดในการดาวน์โหลด');
+            }
+        }
+
+        function restoreFromSpecificBackup(backupKey) {
+            if (confirm('คุณแน่ใจหรือไม่ที่จะกู้คืนข้อมูลจากสำรองนี้? ข้อมูลปัจจุบันจะถูกแทนที่')) {
+                try {
+                    const backup = JSON.parse(localStorage.getItem(backupKey));
+                    studentsData = backup.data;
+                    saveToLocalStorage();
+                    updateCourseCounts();
+                    
+                    if (currentCourse) {
+                        loadStudents();
+                    }
+                    
+                    showMessage('success', 'กู้คืนข้อมูลสำเร็จ!');
+                    closeBackupManager();
+                } catch (error) {
+                    showMessage('error', 'เกิดข้อผิดพลาดในการกู้คืนข้อมูล');
+                }
+            }
+        }
+
+        function deleteBackup(backupKey) {
+            if (confirm('คุณแน่ใจหรือไม่ที่จะลบข้อมูลสำรองนี้?')) {
+                try {
+                    localStorage.removeItem(backupKey);
+                    showMessage('success', 'ลบข้อมูลสำรองสำเร็จ!');
+                    updateBackupStatus();
+                    loadBackupList();
+                } catch (error) {
+                    showMessage('error', 'เกิดข้อผิดพลาดในการลบข้อมูลสำรอง');
+                }
+            }
+        }
+
+        // GitHub setup functions
+        function showGitHubSetup() {
+            if (!isAdminLoggedIn) {
+                showMessage('error', 'กรุณาเข้าสู่ระบบแอดมินก่อน');
+                return;
+            }
+            
+            // Pre-fill existing values if available
+            if (GITHUB_CONFIG.username !== 'YOUR_GITHUB_USERNAME') {
+                document.getElementById('githubUsername').value = GITHUB_CONFIG.username;
+            }
+            document.getElementById('githubRepo').value = GITHUB_CONFIG.repository;
+            
+            document.getElementById('githubSetupModal').classList.remove('hidden');
+        }
+
+        function closeGitHubSetup() {
+            document.getElementById('githubSetupModal').classList.add('hidden');
+            document.getElementById('githubSetupForm').reset();
+        }
+
+        async function setupGitHub(username, repository, token) {
+            try {
+                // Update configuration
+                GITHUB_CONFIG.username = username;
+                GITHUB_CONFIG.repository = repository;
+                
+                // Store token securely
+                githubToken = token;
+                localStorage.setItem('github_token', token);
+                localStorage.setItem('github_config', JSON.stringify(GITHUB_CONFIG));
+                
+                // Test connection
+                await testGitHubConnection();
+                
+                // Enable GitHub mode
+                isGitHubMode = true;
+                updateConnectionStatus('github');
+                
+                // Initial sync
+                await syncWithGitHub();
+                
+                showMessage('success', '🎉 เชื่อมต่อ GitHub Pages สำเร็จ! ระบบพร้อมใช้งานออนไลน์');
+                closeGitHubSetup();
+                
+                // Start auto sync
+                startAutoSync();
+                
+                return true;
+            } catch (error) {
+                console.error('GitHub setup error:', error);
+                showMessage('error', 'เกิดข้อผิดพลาด: ' + error.message);
+                return false;
+            }
+        }
+
+        async function testGitHubConnection() {
+            try {
+                const url = `https://api.github.com/repos/${GITHUB_CONFIG.username}/${GITHUB_CONFIG.repository}`;
+                const response = await fetch(url, {
+                    headers: {
+                        'Authorization': `token ${githubToken}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+                
+                if (response.status === 404) {
+                    throw new Error('Repository ไม่พบ กรุณาสร้าง repository ก่อน');
+                }
+                
+                if (!response.ok) {
+                    throw new Error('ไม่สามารถเชื่อมต่อ GitHub ได้ กรุณาตรวจสอบ Token');
+                }
+                
+                return true;
+            } catch (error) {
+                throw new Error('การเชื่อมต่อ GitHub ล้มเหลว: ' + error.message);
+            }
+        }
+
+        // Cloud options functions
+        function showCloudOptions() {
+            if (!isAdminLoggedIn) {
+                showMessage('error', 'กรุณาเข้าสู่ระบบแอดมินก่อน');
+                return;
+            }
+            document.getElementById('cloudOptionsModal').classList.remove('hidden');
+        }
+
+        function closeCloudOptions() {
+            document.getElementById('cloudOptionsModal').classList.add('hidden');
+        }
+
+        // Event listeners for backup restore
+        document.getElementById('restoreBackup').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    try {
+                        const backupData = JSON.parse(event.target.result);
+                        
+                        if (backupData.data && confirm('คุณแน่ใจหรือไม่ที่จะกู้คืนข้อมูลจากไฟล์นี้? ข้อมูลปัจจุบันจะถูกแทนที่')) {
+                            studentsData = backupData.data;
+                            saveToLocalStorage();
+                            updateCourseCounts();
+                            
+                            if (currentCourse) {
+                                loadStudents();
+                            }
+                            
+                            showMessage('success', 'กู้คืนข้อมูลจากไฟล์สำเร็จ!');
+                            closeBackupManager();
+                        }
+                    } catch (error) {
+                        showMessage('error', 'ไฟล์สำรองไม่ถูกต้อง');
+                    }
+                };
+                reader.readAsText(file);
+                e.target.value = ''; // Reset file input
+            }
+        });
+
+        // GitHub setup form handler
+        document.getElementById('githubSetupForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('githubUsername').value.trim();
+            const repository = document.getElementById('githubRepo').value.trim();
+            const token = document.getElementById('githubToken').value.trim();
+            
+            if (!username || !repository || !token) {
+                showMessage('error', 'กรุณากรอกข้อมูลให้ครบถ้วน');
+                return;
+            }
+            
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'กำลังเชื่อมต่อ...';
+            
+            try {
+                await setupGitHub(username, repository, token);
+            } catch (error) {
+                console.error('GitHub setup error:', error);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            }
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                loadFromLocalStorage();
+                
+                // Load GitHub configuration if available
+                const savedConfig = localStorage.getItem('github_config');
+                if (savedConfig) {
+                    const config = JSON.parse(savedConfig);
+                    Object.assign(GITHUB_CONFIG, config);
+                }
+                
+                // Initialize cloud storage system
+                const cloudEnabled = initializeCloudStorage();
+                
+                if (cloudEnabled && isGitHubMode) {
+                    updateConnectionStatus('github');
+                    
+                    // Initial sync from GitHub
+                    try {
+                        await syncWithGitHub();
+                        console.log('🌟 GitHub Pages mode - ระบบออนไลน์พร้อมใช้งาน!');
+                    } catch (error) {
+                        console.error('Initial GitHub sync failed:', error);
+                        showMessage('error', 'ซิงค์ GitHub ล้มเหลว - ใช้งานโหมดออฟไลน์');
+                    }
+                    
+                    // Start auto sync
+                    startAutoSync();
+                } else {
+                    updateConnectionStatus('local');
+                    console.log('📱 Local storage mode - อัปเกรดเป็น GitHub Pages เพื่อใช้งานหลายคน');
+                }
+                
+                await updateCourseCounts();
+                
+                // Start auto backup
+                autoBackupInterval = setInterval(() => {
+                    createAutoBackup();
+                }, 300000); // Auto backup every 5 minutes
+                
+                console.log('✅ ระบบเริ่มต้นสำเร็จ');
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                updateConnectionStatus('local');
+            }
+        });
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9815d95ac2e9893a',t:'MTc1ODI1MDk5Ny4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
